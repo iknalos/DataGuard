@@ -51,24 +51,26 @@ class ThrottleVpnService : VpnService() {
         val p = ThrottleProxy(this, bucket)
         p.start()
         proxy = p
+        // We bring up a VPN purely to publish a device-wide HTTP proxy (our
+        // throttling proxy). We deliberately route ONLY our own unused subnet,
+        // so real app traffic is NOT captured by the TUN -- it flows normally
+        // over the mobile network and can never be black-holed. Apps that
+        // honour the system proxy (browsers and most apps) get throttled.
+        // DataGuard excludes itself so its relayed upstream connections and DNS
+        // use the real network directly, with no dependency on tunnelled DNS.
         val builder = Builder()
             .setSession("DataGuard speed cap")
             .setMtu(1500)
             .addAddress("10.111.222.1", 24)
-            .addRoute("0.0.0.0", 0)
-            .addDnsServer("10.111.222.53")
+            .addRoute("10.111.222.0", 24)
             .setHttpProxy(ProxyInfo.buildDirectProxy("127.0.0.1", p.port))
-            .setBlocking(true)
         try {
-            // Capture IPv6 too, otherwise QUIC over IPv6 bypasses the cap.
-            builder.addAddress("fd00:da7a:6a4d::1", 64)
-            builder.addRoute("::", 0)
+            builder.addDisallowedApplication(packageName)
         } catch (e: Exception) {
-            // IPv6 unavailable; IPv4 capture still applies.
+            // Package lookup failed; proceed without self-exclusion.
         }
         val fd = builder.establish() ?: return false
         tun = fd
-        dns = TunDnsForwarder(this, fd).also { it.start() }
         return true
     }
 

@@ -10,7 +10,7 @@
     <string name="save">Save</string>
     <string name="top_apps">Top data consumers this cycle</string>
     <string name="speed_cap">Speed cap</string>
-    <string name="speed_cap_explainer">Cap this device\'s connection speed so data drains slower and lasts longer. Uses a local VPN — no traffic leaves the device. On a Fire TV Stick, this caps the stick\'s own apps (Stremio, YouTube, Prime). Video may buffer at low caps; that is expected.</string>
+    <string name="speed_cap_explainer">Cap this device\'s speed so data drains slower and lasts longer. Uses a local VPN — no traffic leaves the device, and your internet keeps working. Throttles browsers and apps that use the system proxy; video may buffer at low caps (that is expected). Tap a speed to apply it instantly — no Save needed.</string>
     <string name="speed_off">Off (full speed)</string>
     <string name="speed_1">1 Mbps (~0.45 GB/hr)</string>
     <string name="speed_2">2 Mbps (~0.9 GB/hr)</string>
