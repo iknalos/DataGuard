@@ -15,6 +15,7 @@ import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.RadioGroup
+import android.widget.Switch
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
@@ -70,6 +71,15 @@ class MainActivity : AppCompatActivity() {
             if (mbps != ThrottleVpnService.currentMbps) onSpeedSelected(mbps)
         }
 
+        syncHotspotControls()
+        findViewById<Switch>(R.id.switchHotspot).setOnCheckedChangeListener { btn, isChecked ->
+            if (!btn.isPressed) return@setOnCheckedChangeListener // ignore programmatic sync
+            if (isChecked) startHotspotProxy(selectedHotspotMbps()) else stopHotspotProxy()
+        }
+        findViewById<RadioGroup>(R.id.hotspotSpeedGroup).setOnCheckedChangeListener { _, _ ->
+            if (HotspotProxyService.currentMbps != 0) startHotspotProxy(selectedHotspotMbps())
+        }
+
         if (Build.VERSION.SDK_INT >= 33 &&
             ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
                 != PackageManager.PERMISSION_GRANTED
@@ -86,7 +96,52 @@ class MainActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         syncSpeedSelector()
+        syncHotspotControls()
         refresh()
+    }
+
+    private fun selectedHotspotMbps(): Int =
+        when (findViewById<RadioGroup>(R.id.hotspotSpeedGroup).checkedRadioButtonId) {
+            R.id.rbHotspot2 -> 2
+            R.id.rbHotspot10 -> 10
+            else -> 5
+        }
+
+    private fun startHotspotProxy(mbps: Int) {
+        startForegroundService(
+            Intent(this, HotspotProxyService::class.java)
+                .putExtra(HotspotProxyService.EXTRA_MBPS, mbps)
+        )
+        syncHotspotControls()
+    }
+
+    private fun stopHotspotProxy() {
+        startService(
+            Intent(this, HotspotProxyService::class.java)
+                .setAction(HotspotProxyService.ACTION_STOP)
+        )
+        syncHotspotControls()
+    }
+
+    private fun syncHotspotControls() {
+        val on = HotspotProxyService.currentMbps != 0
+        val sw = findViewById<Switch>(R.id.switchHotspot)
+        if (sw.isChecked != on) sw.isChecked = on
+        val info = findViewById<TextView>(R.id.txtHotspotProxy)
+        if (on) {
+            val ip = NetworkUtils.hotspotAddress()
+            info.text = if (ip != null) {
+                "On each connected device, open Wi-Fi settings → your hotspot → Proxy = Manual, " +
+                    "Host = $ip, Port = ${HotspotProxyService.PORT}. " +
+                    "Capped at ${HotspotProxyService.currentMbps} Mbps."
+            } else {
+                "Turn your hotspot ON first, then toggle this again so DataGuard can detect " +
+                    "its IP address. Proxy port is ${HotspotProxyService.PORT}."
+            }
+            info.visibility = View.VISIBLE
+        } else {
+            info.visibility = View.GONE
+        }
     }
 
     private fun onSpeedSelected(mbps: Int) {

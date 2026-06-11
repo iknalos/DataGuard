@@ -11,16 +11,23 @@ import java.net.Socket
 import java.util.concurrent.Executors
 
 /**
- * Minimal local HTTP proxy (CONNECT for HTTPS, absolute-form for plain HTTP)
- * that pushes every byte through a shared [TokenBucket]. Android points all
- * apps at this proxy via VpnService.Builder.setHttpProxy().
+ * Minimal HTTP proxy (CONNECT for HTTPS, absolute-form for plain HTTP) that
+ * pushes every byte through a shared [TokenBucket].
  *
- * Upstream sockets are protect()-ed so they bypass the VPN and reach the
- * real network directly.
+ * Two ways it is used:
+ *  - On localhost, adopted device-wide by [ThrottleVpnService] via
+ *    VpnService.Builder.setHttpProxy() to cap the phone's own apps.
+ *  - On 0.0.0.0, exposed to hotspot clients by [HotspotProxyService] so
+ *    tethered devices that point their Wi-Fi proxy here are capped too.
+ *
+ * When a [vpn] is supplied, upstream sockets are protect()-ed so they bypass
+ * the VPN; for the hotspot case [vpn] is null and sockets route normally.
  */
 class ThrottleProxy(
-    private val vpn: VpnService,
-    private val bucket: TokenBucket
+    private val vpn: VpnService?,
+    private val bucket: TokenBucket,
+    private val bindHost: String = "127.0.0.1",
+    private val bindPort: Int = 0
 ) : Closeable {
 
     private val server = ServerSocket()
@@ -32,7 +39,7 @@ class ThrottleProxy(
     val port: Int get() = server.localPort
 
     fun start() {
-        server.bind(InetSocketAddress("127.0.0.1", 0))
+        server.bind(InetSocketAddress(bindHost, bindPort))
         Thread({ acceptLoop() }, "proxy-accept").start()
     }
 
@@ -69,7 +76,7 @@ class ThrottleProxy(
             } ?: run { client.close(); return }
 
             upstream = Socket()
-            vpn.protect(upstream)
+            vpn?.protect(upstream)
             upstream.connect(InetSocketAddress(target.first, target.second), 15000)
             upstream.tcpNoDelay = true
 

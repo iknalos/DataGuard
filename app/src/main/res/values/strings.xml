@@ -15,4 +15,6 @@
     <string name="speed_2">2 Mbps</string>
     <string name="speed_5">5 Mbps</string>
     <string name="speed_10">10 Mbps</string>
+    <string name="hotspot_cap">Hotspot speed cap</string>
+    <string name="hotspot_cap_explainer">Throttle devices on your hotspot. Pick a speed and turn this on, then on each connected device set a manual Wi-Fi proxy (instructions appear below). Works for browsers and most apps; a guest can leave the proxy unset to stay un-throttled.</string>
 </resources>
