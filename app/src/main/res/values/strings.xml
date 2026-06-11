@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">DataGuard</string>
+    <string name="grant_explainer">DataGuard needs Usage Access to read mobile data statistics. Tap the button below, find DataGuard in the list, and turn the permission on.</string>
+    <string name="grant_button">Grant usage access</string>
+    <string name="this_cycle">This billing cycle</string>
+    <string name="settings">Settings</string>
+    <string name="cap_hint">Monthly data cap (GB)</string>
+    <string name="cycle_day_hint">Billing cycle reset day (1-31)</string>
+    <string name="save">Save</string>
+    <string name="top_apps">Top data consumers this cycle</string>
+</resources>
