@@ -7,7 +7,7 @@ object NetworkUtils {
 
     /**
      * Best guess at the IPv4 address hotspot clients should target. Android's
-     * tether interface is usually named ap*/swlan*/wlan1 and sits on a
+     * tether interface is usually named ap0, swlan0 or wlan1 and sits on a
      * 192.168.x.1-style subnet. Falls back to any site-local IPv4 if the
      * interface name isn't recognised.
      */
