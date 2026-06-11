@@ -8,12 +8,16 @@ import android.content.Intent
 import androidx.core.app.NotificationCompat
 
 object Notifier {
-    private const val CHANNEL = "data_alerts"
+    private const val ALERT_CHANNEL = "data_alerts"
+    const val STATUS_CHANNEL = "throttle_status"
 
     fun ensureChannel(context: Context) {
         val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         nm.createNotificationChannel(
-            NotificationChannel(CHANNEL, "Data usage alerts", NotificationManager.IMPORTANCE_HIGH)
+            NotificationChannel(ALERT_CHANNEL, "Data usage alerts", NotificationManager.IMPORTANCE_HIGH)
+        )
+        nm.createNotificationChannel(
+            NotificationChannel(STATUS_CHANNEL, "Speed cap status", NotificationManager.IMPORTANCE_LOW)
         )
     }
 
@@ -22,7 +26,7 @@ object Notifier {
         val pi = PendingIntent.getActivity(
             context, 0, Intent(context, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE
         )
-        val notification = NotificationCompat.Builder(context, CHANNEL)
+        val notification = NotificationCompat.Builder(context, ALERT_CHANNEL)
             .setSmallIcon(R.drawable.ic_stat_data)
             .setContentTitle(title)
             .setContentText(text)

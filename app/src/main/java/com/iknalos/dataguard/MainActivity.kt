@@ -1,9 +1,11 @@
 package com.iknalos.dataguard
 
 import android.Manifest
+import android.app.Activity
 import android.app.usage.NetworkStats
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.VpnService
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
@@ -12,8 +14,10 @@ import android.widget.Button
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.ProgressBar
+import android.widget.RadioGroup
 import android.widget.TextView
 import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
@@ -29,6 +33,17 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var prefs: Prefs
     private lateinit var repo: DataUsageRepository
+    private var pendingMbps = 0
+
+    private val vpnConsent =
+        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+            if (result.resultCode == Activity.RESULT_OK) {
+                startThrottle(pendingMbps)
+            } else {
+                Toast.makeText(this, "VPN permission is required to cap speed", Toast.LENGTH_SHORT).show()
+                syncSpeedSelector()
+            }
+        }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -43,6 +58,17 @@ class MainActivity : AppCompatActivity() {
             startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS))
         }
         findViewById<Button>(R.id.btnSave).setOnClickListener { saveSettings() }
+
+        syncSpeedSelector()
+        findViewById<RadioGroup>(R.id.speedGroup).setOnCheckedChangeListener { _, checkedId ->
+            val mbps = when (checkedId) {
+                R.id.rbSpeed2 -> 2
+                R.id.rbSpeed5 -> 5
+                R.id.rbSpeed10 -> 10
+                else -> 0
+            }
+            if (mbps != ThrottleVpnService.currentMbps) onSpeedSelected(mbps)
+        }
 
         if (Build.VERSION.SDK_INT >= 33 &&
             ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
@@ -59,7 +85,43 @@ class MainActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
+        syncSpeedSelector()
         refresh()
+    }
+
+    private fun onSpeedSelected(mbps: Int) {
+        if (mbps == 0) {
+            startService(
+                Intent(this, ThrottleVpnService::class.java)
+                    .setAction(ThrottleVpnService.ACTION_STOP)
+            )
+            return
+        }
+        val consent = VpnService.prepare(this)
+        if (consent != null) {
+            pendingMbps = mbps
+            vpnConsent.launch(consent)
+        } else {
+            startThrottle(mbps)
+        }
+    }
+
+    private fun startThrottle(mbps: Int) {
+        startForegroundService(
+            Intent(this, ThrottleVpnService::class.java)
+                .putExtra(ThrottleVpnService.EXTRA_MBPS, mbps)
+        )
+    }
+
+    private fun syncSpeedSelector() {
+        val id = when (ThrottleVpnService.currentMbps) {
+            2 -> R.id.rbSpeed2
+            5 -> R.id.rbSpeed5
+            10 -> R.id.rbSpeed10
+            else -> R.id.rbSpeedOff
+        }
+        val group = findViewById<RadioGroup>(R.id.speedGroup)
+        if (group.checkedRadioButtonId != id) group.check(id)
     }
 
     private fun scheduleWorker() {
@@ -106,28 +168,29 @@ class MainActivity : AppCompatActivity() {
         findViewById<TextView>(R.id.txtToday).text = "Today: ${Format.bytes(todayUsed)}"
 
         val perApp = repo.getPerAppMobileBytes(cycleStart, now)
-        val hotspotBytes = perApp.firstOrNull { it.uid == NetworkStats.Bucket.UID_TETHERING }?.bytes ?: 0L
+        val hotspotBytes =
+            perApp.firstOrNull { it.uid == NetworkStats.Bucket.UID_TETHERING }?.bytes ?: 0L
         findViewById<TextView>(R.id.txtHotspot).text =
             "Hotspot this cycle: ${Format.bytes(hotspotBytes)}"
 
-        // Pace + projection
         val dateFmt = SimpleDateFormat("MMM d", Locale.US)
         val elapsedMs = (now - cycleStart).coerceAtLeast(3_600_000L)
         val perDay = cycleUsed.toDouble() / elapsedMs * 86_400_000.0
         val projected = perDay * (cycleEnd - cycleStart) / 86_400_000.0
         val projection = StringBuilder("Pace: ${Format.bytes(perDay.toLong())}/day. ")
-        projection.append("On track for ${Format.bytes(projected.toLong())} by ${dateFmt.format(Date(cycleEnd))}.")
-        if (perDay > 0 && cycleUsed < capBytes) {
+        projection.append(
+            "On track for ${Format.bytes(projected.toLong())} by ${dateFmt.format(Date(cycleEnd))}."
+        )
+        if (cycleUsed >= capBytes) {
+            projection.append(" Cap already exceeded.")
+        } else if (perDay > 0) {
             val runOut = now + ((capBytes - cycleUsed) / perDay * 86_400_000.0).toLong()
             if (runOut < cycleEnd) {
                 projection.append(" At this pace you run out around ${dateFmt.format(Date(runOut))}!")
             }
-        } else if (cycleUsed >= capBytes) {
-            projection.append(" Cap already exceeded.")
         }
         findViewById<TextView>(R.id.txtProjection).text = projection.toString()
 
-        // Top consumers
         val container = findViewById<LinearLayout>(R.id.appList)
         container.removeAllViews()
         for (app in perApp.take(12)) {

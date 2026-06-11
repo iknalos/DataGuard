@@ -9,4 +9,10 @@
     <string name="cycle_day_hint">Billing cycle reset day (1-31)</string>
     <string name="save">Save</string>
     <string name="top_apps">Top data consumers this cycle</string>
+    <string name="speed_cap">Speed cap</string>
+    <string name="speed_cap_explainer">Limit your connection speed so data lasts longer. Uses a local VPN (no traffic leaves your phone). Note: hotspot guests are not capped — Android VPNs cannot see tethered traffic.</string>
+    <string name="speed_off">Off</string>
+    <string name="speed_2">2 Mbps</string>
+    <string name="speed_5">5 Mbps</string>
+    <string name="speed_10">10 Mbps</string>
 </resources>
