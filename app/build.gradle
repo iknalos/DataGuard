@@ -11,13 +11,30 @@ android {
         applicationId "com.iknalos.dataguard"
         minSdk 29
         targetSdk 34
-        versionCode 7
-        versionName "1.4.1"
+        versionCode 8
+        versionName "1.4.2"
+    }
+
+    def ksFile = file('dataguard.keystore')
+
+    signingConfigs {
+        shared {
+            if (ksFile.exists()) {
+                storeFile ksFile
+                storePassword 'dataguard'
+                keyAlias 'dataguard'
+                keyPassword 'dataguard'
+            }
+        }
     }
 
     buildTypes {
+        debug {
+            if (ksFile.exists()) signingConfig signingConfigs.shared
+        }
         release {
             minifyEnabled false
+            if (ksFile.exists()) signingConfig signingConfigs.shared
         }
     }
 

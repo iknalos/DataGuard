@@ -26,6 +26,22 @@ jobs:
         with:
           gradle-version: '8.7'
 
+      # Generate a stable signing key once and commit it, so every build is
+      # signed identically and the app updates in place (no uninstall needed).
+      - name: Ensure persistent signing keystore
+        run: |
+          if [ ! -f app/dataguard.keystore ]; then
+            keytool -genkeypair -v -keystore app/dataguard.keystore \
+              -storepass dataguard -keypass dataguard -alias dataguard \
+              -keyalg RSA -keysize 2048 -validity 10000 \
+              -dname "CN=DataGuard"
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add -f app/dataguard.keystore
+            git commit -m "Add persistent signing keystore [skip ci]"
+            git push origin HEAD:${{ github.ref_name }}
+          fi
+
       - name: Build debug APK
         run: gradle assembleDebug --no-daemon
 
