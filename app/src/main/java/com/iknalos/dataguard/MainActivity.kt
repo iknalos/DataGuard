@@ -10,11 +10,14 @@ import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
 import android.view.View
+import android.widget.AdapterView
+import android.widget.ArrayAdapter
 import android.widget.Button
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.RadioGroup
+import android.widget.Spinner
 import android.widget.Switch
 import android.widget.TextView
 import android.widget.Toast
@@ -34,15 +37,17 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var prefs: Prefs
     private lateinit var repo: DataUsageRepository
-    private var pendingMbps = 0
+
+    private val capValues = intArrayOf(0, 1, 2, 5, 10)
 
     private val vpnConsent =
         registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
             if (result.resultCode == Activity.RESULT_OK) {
-                startThrottle(pendingMbps)
+                startThrottleService()
             } else {
                 Toast.makeText(this, "VPN permission is required to cap speed", Toast.LENGTH_SHORT).show()
                 syncSpeedSelector()
+                refresh()
             }
         }
 
@@ -73,8 +78,13 @@ class MainActivity : AppCompatActivity() {
                 R.id.rbSpeed10 -> 10
                 else -> 0
             }
-            if (mbps != ThrottleVpnService.currentMbps) onSpeedSelected(mbps)
+            if (mbps != prefs.globalMbps) {
+                prefs.globalMbps = mbps
+                applyThrottle()
+            }
         }
+
+        findViewById<RadioGroup>(R.id.usageRangeGroup).setOnCheckedChangeListener { _, _ -> refresh() }
 
         syncHotspotControls()
         findViewById<Switch>(R.id.switchHotspot).setOnCheckedChangeListener { btn, isChecked ->
@@ -104,6 +114,47 @@ class MainActivity : AppCompatActivity() {
         syncHotspotControls()
         refresh()
     }
+
+    // ---- Global + per-app speed cap ----
+
+    /** Starts the throttle service if any cap is set, otherwise stops it. */
+    private fun applyThrottle() {
+        val active = prefs.globalMbps > 0 || prefs.appCaps().isNotEmpty()
+        if (!active) {
+            startService(
+                Intent(this, ThrottleVpnService::class.java)
+                    .setAction(ThrottleVpnService.ACTION_STOP)
+            )
+            return
+        }
+        val consent = VpnService.prepare(this)
+        if (consent != null) {
+            vpnConsent.launch(consent)
+        } else {
+            startThrottleService()
+        }
+    }
+
+    private fun startThrottleService() {
+        startForegroundService(
+            Intent(this, ThrottleVpnService::class.java)
+                .setAction(ThrottleVpnService.ACTION_APPLY)
+        )
+    }
+
+    private fun syncSpeedSelector() {
+        val id = when (prefs.globalMbps) {
+            1 -> R.id.rbSpeed1
+            2 -> R.id.rbSpeed2
+            5 -> R.id.rbSpeed5
+            10 -> R.id.rbSpeed10
+            else -> R.id.rbSpeedOff
+        }
+        val group = findViewById<RadioGroup>(R.id.speedGroup)
+        if (group.checkedRadioButtonId != id) group.check(id)
+    }
+
+    // ---- Hotspot cap ----
 
     private fun selectedHotspotMbps(): Int =
         when (findViewById<RadioGroup>(R.id.hotspotSpeedGroup).checkedRadioButtonId) {
@@ -149,41 +200,7 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun onSpeedSelected(mbps: Int) {
-        if (mbps == 0) {
-            startService(
-                Intent(this, ThrottleVpnService::class.java)
-                    .setAction(ThrottleVpnService.ACTION_STOP)
-            )
-            return
-        }
-        val consent = VpnService.prepare(this)
-        if (consent != null) {
-            pendingMbps = mbps
-            vpnConsent.launch(consent)
-        } else {
-            startThrottle(mbps)
-        }
-    }
-
-    private fun startThrottle(mbps: Int) {
-        startForegroundService(
-            Intent(this, ThrottleVpnService::class.java)
-                .putExtra(ThrottleVpnService.EXTRA_MBPS, mbps)
-        )
-    }
-
-    private fun syncSpeedSelector() {
-        val id = when (ThrottleVpnService.currentMbps) {
-            1 -> R.id.rbSpeed1
-            2 -> R.id.rbSpeed2
-            5 -> R.id.rbSpeed5
-            10 -> R.id.rbSpeed10
-            else -> R.id.rbSpeedOff
-        }
-        val group = findViewById<RadioGroup>(R.id.speedGroup)
-        if (group.checkedRadioButtonId != id) group.check(id)
-    }
+    // ---- Data tracking + per-app list ----
 
     private fun scheduleWorker() {
         val request = PeriodicWorkRequestBuilder<UsageCheckWorker>(30, TimeUnit.MINUTES).build()
@@ -219,10 +236,11 @@ class MainActivity : AppCompatActivity() {
         val now = System.currentTimeMillis()
         val cycleStart = Prefs.cycleStart(prefs.cycleDay)
         val cycleEnd = Prefs.nextCycleStart(prefs.cycleDay)
+        val todayStart = Prefs.todayStart()
         val capBytes = (prefs.capGb * 1e9).toLong()
 
         val cycleUsed = repo.getMobileBytes(cycleStart, now)
-        val todayUsed = repo.getMobileBytes(Prefs.todayStart(), now)
+        val todayUsed = repo.getMobileBytes(todayStart, now)
 
         findViewById<TextView>(R.id.txtCycle).text =
             "${Format.bytes(cycleUsed)} / ${Format.bytes(capBytes)}"
@@ -233,9 +251,7 @@ class MainActivity : AppCompatActivity() {
 
         findViewById<TextView>(R.id.txtToday).text = "Today: ${Format.bytes(todayUsed)}"
 
-        val perApp = repo.getPerAppMobileBytes(cycleStart, now)
-        val hotspotBytes =
-            perApp.firstOrNull { it.uid == NetworkStats.Bucket.UID_TETHERING }?.bytes ?: 0L
+        val hotspotBytes = repo.getPerAppBytesRaw(cycleStart, now)[NetworkStats.Bucket.UID_TETHERING] ?: 0L
         findViewById<TextView>(R.id.txtHotspot).text =
             "Hotspot this cycle: ${Format.bytes(hotspotBytes)}"
 
@@ -257,15 +273,60 @@ class MainActivity : AppCompatActivity() {
         }
         findViewById<TextView>(R.id.txtProjection).text = projection.toString()
 
+        renderAppList(now, cycleStart, todayStart)
+    }
+
+    private fun renderAppList(now: Long, cycleStart: Long, todayStart: Long) {
+        val showToday = findViewById<RadioGroup>(R.id.usageRangeGroup).checkedRadioButtonId == R.id.rbRangeToday
+        val rangeStart = if (showToday) todayStart else cycleStart
+        val perApp = repo.getPerAppMobileBytes(rangeStart, now)
+        val hourMap = repo.getPerAppBytesRaw(now - 3_600_000L, now)
+        val todayMap = repo.getPerAppBytesRaw(todayStart, now)
+        val caps = prefs.appCaps()
+
         val container = findViewById<LinearLayout>(R.id.appList)
         container.removeAllViews()
-        for (app in perApp.take(12)) {
+        for (app in perApp) {
             val row = layoutInflater.inflate(R.layout.item_app_usage, container, false)
             row.findViewById<TextView>(R.id.appName).text = app.label
             row.findViewById<TextView>(R.id.appBytes).text = Format.bytes(app.bytes)
+            row.findViewById<TextView>(R.id.appRecency).text = recencyLabel(app.uid, hourMap, todayMap)
+
+            val spinner = row.findViewById<Spinner>(R.id.appCap)
+            val pkg = app.pkg
+            if (pkg == null) {
+                // Tethering/system/removed buckets aren't real apps to cap.
+                spinner.visibility = View.INVISIBLE
+            } else {
+                val adapter = ArrayAdapter.createFromResource(
+                    this, R.array.cap_options, android.R.layout.simple_spinner_item
+                )
+                adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+                spinner.adapter = adapter
+                spinner.setSelection(capToIndex(caps[pkg] ?: 0), false)
+                spinner.tag = false // not yet ready; ignore the initial callback
+                spinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+                    override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
+                        if (spinner.tag != true) return
+                        prefs.setAppCap(pkg, capValues[position])
+                        applyThrottle()
+                    }
+
+                    override fun onNothingSelected(parent: AdapterView<*>?) {}
+                }
+                spinner.post { spinner.tag = true }
+            }
             container.addView(row)
         }
     }
+
+    private fun recencyLabel(uid: Int, hourMap: Map<Int, Long>, todayMap: Map<Int, Long>): String = when {
+        (hourMap[uid] ?: 0L) > 0L -> getString(R.string.recency_hour)
+        (todayMap[uid] ?: 0L) > 0L -> getString(R.string.recency_today)
+        else -> getString(R.string.recency_cycle)
+    }
+
+    private fun capToIndex(mbps: Int): Int = capValues.indexOf(mbps).let { if (it < 0) 0 else it }
 
     private fun trimNumber(v: Double): String =
         if (v == v.toLong().toDouble()) v.toLong().toString() else v.toString()

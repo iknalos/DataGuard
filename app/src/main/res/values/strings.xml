@@ -8,7 +8,20 @@
     <string name="cap_hint">Monthly data cap (GB)</string>
     <string name="cycle_day_hint">Billing cycle reset day (1-31)</string>
     <string name="save">Save</string>
-    <string name="top_apps">Top data consumers this cycle</string>
+    <string name="top_apps">Apps by data use</string>
+    <string name="per_app_hint">Heaviest users at the top. Use the dropdown on the right to give any app its own speed limit.</string>
+    <string name="range_today">Today</string>
+    <string name="range_cycle">This cycle</string>
+    <string name="recency_hour">active in the last hour</string>
+    <string name="recency_today">used earlier today</string>
+    <string name="recency_cycle">used earlier this cycle</string>
+    <string-array name="cap_options">
+        <item>No limit</item>
+        <item>1 Mbps</item>
+        <item>2 Mbps</item>
+        <item>5 Mbps</item>
+        <item>10 Mbps</item>
+    </string-array>
     <string name="speed_cap">Speed cap</string>
     <string name="speed_cap_explainer">Cap this device\'s speed so data drains slower and lasts longer. Uses a local VPN — no traffic leaves the device, and your internet keeps working. Throttles browsers and apps that use the system proxy; video may buffer at low caps (that is expected). Tap a speed to apply it instantly — no Save needed.</string>
     <string name="speed_off">Off (full speed)</string>

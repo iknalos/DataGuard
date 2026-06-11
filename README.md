@@ -9,7 +9,8 @@ A lightweight Android app that keeps your mobile data plan from vanishing. Built
 - **Cycle tracking** — see exactly how much mobile data you've used this billing cycle vs. your cap, with a progress bar.
 - **Today's usage** — at a glance.
 - **Hotspot / tethering usage** — counted separately, so you know how much your hotspot guests are costing you.
-- **Per-app breakdown** — top 12 data consumers this cycle (YouTube, Instagram, etc.).
+- **Per-app breakdown** — every app sorted by data use (heaviest first), with a **Today / This-cycle** toggle and a rough "last active" indicator per app. Requires Usage access.
+- **Per-app speed limits** — give any app its own cap (e.g. YouTube at 1 Mbps) straight from the dropdown in its usage row, on top of (or instead of) the global cap. Same proxy-aware coverage as the global cap.
 - **Pace & projection** — "at this pace you run out around Jun 23" warnings based on your daily average.
 - **Threshold alerts** — notifications at 50%, 80%, 95%, and 100% of your cap, checked every 30 minutes in the background.
 

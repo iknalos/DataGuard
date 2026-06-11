@@ -7,7 +7,7 @@ import android.content.Context
 import android.net.ConnectivityManager
 import android.os.Process
 
-data class AppUsage(val uid: Int, val label: String, val bytes: Long)
+data class AppUsage(val uid: Int, val pkg: String?, val label: String, val bytes: Long)
 
 class DataUsageRepository(private val context: Context) {
 
@@ -34,8 +34,8 @@ class DataUsageRepository(private val context: Context) {
         0L
     }
 
-    /** Mobile data per app (and special buckets like tethering), sorted descending. */
-    fun getPerAppMobileBytes(start: Long, end: Long): List<AppUsage> {
+    /** Raw mobile data per app uid between two timestamps. */
+    fun getPerAppBytesRaw(start: Long, end: Long): Map<Int, Long> {
         val totals = HashMap<Int, Long>()
         try {
             val stats = statsManager.querySummary(
@@ -48,12 +48,18 @@ class DataUsageRepository(private val context: Context) {
             }
             stats.close()
         } catch (e: Exception) {
-            return emptyList()
+            return emptyMap()
         }
+        return totals
+    }
+
+    /** Mobile data per app (and special buckets like tethering), sorted descending. */
+    fun getPerAppMobileBytes(start: Long, end: Long): List<AppUsage> {
         val pm = context.packageManager
-        return totals.entries
+        return getPerAppBytesRaw(start, end).entries
             .filter { it.value > 0 }
             .map { (uid, bytes) ->
+                var pkg: String? = null
                 val label = when (uid) {
                     NetworkStats.Bucket.UID_TETHERING -> "Hotspot / Tethering"
                     NetworkStats.Bucket.UID_REMOVED -> "Removed apps"
@@ -63,6 +69,7 @@ class DataUsageRepository(private val context: Context) {
                         if (pkgs.isNullOrEmpty()) {
                             "Unknown (uid $uid)"
                         } else {
+                            pkg = pkgs[0]
                             try {
                                 pm.getApplicationLabel(pm.getApplicationInfo(pkgs[0], 0)).toString()
                             } catch (e: Exception) {
@@ -71,7 +78,7 @@ class DataUsageRepository(private val context: Context) {
                         }
                     }
                 }
-                AppUsage(uid, label, bytes)
+                AppUsage(uid, pkg, label, bytes)
             }
             .sortedByDescending { it.bytes }
     }

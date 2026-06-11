@@ -27,7 +27,8 @@ class ThrottleProxy(
     private val vpn: VpnService?,
     private val bucket: TokenBucket,
     private val bindHost: String = "127.0.0.1",
-    private val bindPort: Int = 0
+    private val bindPort: Int = 0,
+    private val bucketSelector: ((Socket) -> TokenBucket)? = null
 ) : Closeable {
 
     private val server = ServerSocket()
@@ -60,6 +61,8 @@ class ThrottleProxy(
         var upstream: Socket? = null
         try {
             client.tcpNoDelay = true
+            // Pick the rate-limit bucket for the app that owns this connection.
+            val connBucket = bucketSelector?.invoke(client) ?: bucket
             val clientIn = client.getInputStream()
             val headerBytes = readHeaders(clientIn) ?: run { client.close(); return }
             val firstLine = String(headerBytes, Charsets.ISO_8859_1).substringBefore("\r\n")
@@ -91,11 +94,11 @@ class ThrottleProxy(
 
             val up = upstream
             val uploader = Thread {
-                pump(clientIn, up.getOutputStream())
+                pump(clientIn, up.getOutputStream(), connBucket)
                 closeQuietly(up)
             }
             uploader.start()
-            pump(up.getInputStream(), client.getOutputStream())
+            pump(up.getInputStream(), client.getOutputStream(), connBucket)
             closeQuietly(client)
             closeQuietly(up)
             uploader.join(2000)
@@ -139,13 +142,13 @@ class ThrottleProxy(
         }
     }
 
-    private fun pump(src: InputStream, dst: OutputStream) {
+    private fun pump(src: InputStream, dst: OutputStream, limit: TokenBucket) {
         val buf = ByteArray(8192)
         try {
             while (true) {
                 val n = src.read(buf)
                 if (n < 0) break
-                bucket.acquire(n)
+                limit.acquire(n)
                 dst.write(buf, 0, n)
                 dst.flush()
             }

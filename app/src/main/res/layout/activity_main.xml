@@ -262,6 +262,35 @@
                 android:textSize="18sp"
                 android:textStyle="bold" />
 
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:text="@string/per_app_hint"
+                android:textSize="13sp" />
+
+            <RadioGroup
+                android:id="@+id/usageRangeGroup"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:orientation="horizontal">
+
+                <RadioButton
+                    android:id="@+id/rbRangeCycle"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:checked="true"
+                    android:text="@string/range_cycle" />
+
+                <RadioButton
+                    android:id="@+id/rbRangeToday"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="16dp"
+                    android:text="@string/range_today" />
+            </RadioGroup>
+
             <LinearLayout
                 android:id="@+id/appList"
                 android:layout_width="match_parent"
