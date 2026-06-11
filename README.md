@@ -22,6 +22,18 @@ A lightweight Android app that keeps your mobile data plan from vanishing. Built
 5. Allow notifications when prompted.
 6. Set your **monthly cap in GB** and the **day of the month your plan resets**, then tap Save.
 
+## Install on a Fire TV Stick (4K / 4K Max, Fire OS 8 / Android 11)
+
+Running DataGuard *on the stick itself* is the reliable way to cap a Fire TV's data, because the throttle then applies to the stick's own apps — there's no tethering layer to bypass. A 2 Mbps cap means the stick can't pull more than ~0.9 GB/hour no matter what's playing (video will buffer at low caps — that's expected and fine).
+
+1. On the Fire Stick: **Settings → My Fire TV → Developer options → Apps from Unknown Sources → ON.** (If you don't see Developer options, go to Settings → My Fire TV → About and click the build/serial line 7 times.)
+2. Install the **Downloader** app from the Fire TV Appstore.
+3. In Downloader, enter the URL of `DataGuard.apk` from this repo's latest [release](../../releases) and install it. (Because the repo is private, either make it public in repo Settings, or use a release asset URL that includes a token — easiest is to flip the repo public temporarily.)
+4. Open DataGuard from your apps list (it also appears on the Fire TV home row), use the remote's D-pad to pick **1 / 2 / 5 / 10 Mbps**, and accept the one-time VPN prompt.
+5. Pick **Off** to restore full speed. The cap survives reboots only if you re-open the app, so just open it and pick a speed whenever you start watching.
+
+On Fire TV the usage-tracking and hotspot sections stay hidden (Fire OS has no usage-access screen) — the speed cap is the part that matters there.
+
 ## How the speed cap works (and its limits)
 
 When you pick a speed, DataGuard starts a local VPN that routes all traffic and publishes a device-wide HTTP proxy backed by an in-app token-bucket rate limiter. DNS is forwarded natively; QUIC/UDP is blocked inside the tunnel, which makes video apps (YouTube etc.) fall back to throttled TCP. No traffic ever leaves your phone — there is no remote VPN server.

@@ -56,13 +56,18 @@ class MainActivity : AppCompatActivity() {
         findViewById<EditText>(R.id.inputCycleDay).setText(prefs.cycleDay.toString())
 
         findViewById<Button>(R.id.btnGrant).setOnClickListener {
-            startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS))
+            try {
+                startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS))
+            } catch (e: Exception) {
+                Toast.makeText(this, "Usage access isn't available on this device", Toast.LENGTH_SHORT).show()
+            }
         }
         findViewById<Button>(R.id.btnSave).setOnClickListener { saveSettings() }
 
         syncSpeedSelector()
         findViewById<RadioGroup>(R.id.speedGroup).setOnCheckedChangeListener { _, checkedId ->
             val mbps = when (checkedId) {
+                R.id.rbSpeed1 -> 1
                 R.id.rbSpeed2 -> 2
                 R.id.rbSpeed5 -> 5
                 R.id.rbSpeed10 -> 10
@@ -170,6 +175,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun syncSpeedSelector() {
         val id = when (ThrottleVpnService.currentMbps) {
+            1 -> R.id.rbSpeed1
             2 -> R.id.rbSpeed2
             5 -> R.id.rbSpeed5
             10 -> R.id.rbSpeed10
@@ -201,7 +207,12 @@ class MainActivity : AppCompatActivity() {
 
     private fun refresh() {
         val granted = repo.hasUsageAccess()
-        findViewById<View>(R.id.grantGroup).visibility = if (granted) View.GONE else View.VISIBLE
+        // On devices without a usage-access settings screen (e.g. Fire TV) there's
+        // nothing to grant, so hide the prompt entirely and just keep the speed cap.
+        val canRequestUsage = Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS)
+            .resolveActivity(packageManager) != null
+        findViewById<View>(R.id.grantGroup).visibility =
+            if (!granted && canRequestUsage) View.VISIBLE else View.GONE
         findViewById<View>(R.id.statsGroup).visibility = if (granted) View.VISIBLE else View.GONE
         if (!granted) return
 

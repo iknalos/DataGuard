@@ -10,11 +10,12 @@
     <string name="save">Save</string>
     <string name="top_apps">Top data consumers this cycle</string>
     <string name="speed_cap">Speed cap</string>
-    <string name="speed_cap_explainer">Limit your connection speed so data lasts longer. Uses a local VPN (no traffic leaves your phone). Note: hotspot guests are not capped — Android VPNs cannot see tethered traffic.</string>
-    <string name="speed_off">Off</string>
-    <string name="speed_2">2 Mbps</string>
-    <string name="speed_5">5 Mbps</string>
-    <string name="speed_10">10 Mbps</string>
+    <string name="speed_cap_explainer">Cap this device\'s connection speed so data drains slower and lasts longer. Uses a local VPN — no traffic leaves the device. On a Fire TV Stick, this caps the stick\'s own apps (Stremio, YouTube, Prime). Video may buffer at low caps; that is expected.</string>
+    <string name="speed_off">Off (full speed)</string>
+    <string name="speed_1">1 Mbps (~0.45 GB/hr)</string>
+    <string name="speed_2">2 Mbps (~0.9 GB/hr)</string>
+    <string name="speed_5">5 Mbps (~2.25 GB/hr)</string>
+    <string name="speed_10">10 Mbps (~4.5 GB/hr)</string>
     <string name="hotspot_cap">Hotspot speed cap</string>
     <string name="hotspot_cap_explainer">Throttle devices on your hotspot. Pick a speed and turn this on, then on each connected device set a manual Wi-Fi proxy (instructions appear below). Works for browsers and most apps; a guest can leave the proxy unset to stay un-throttled.</string>
 </resources>
